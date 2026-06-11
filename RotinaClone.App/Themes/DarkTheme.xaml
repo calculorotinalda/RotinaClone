@@ -1,0 +1,44 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Core Palette -->
+    <Color x:Key="WindowBgColor1">#081B33</Color>
+    <Color x:Key="WindowBgColor2">#0D2C54</Color>
+    
+    <SolidColorBrush x:Key="WindowBackground" Color="#081B33" />
+    <LinearGradientBrush x:Key="WindowBackgroundGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#081B33" Offset="0" />
+        <GradientStop Color="#0D2C54" Offset="0.5" />
+        <GradientStop Color="#124A7A" Offset="1" />
+    </LinearGradientBrush>
+
+    <!-- Glassmorphic Card Brushes -->
+    <SolidColorBrush x:Key="CardBackground" Color="#182C48" />
+    <SolidColorBrush x:Key="CardBorder" Color="#304870" />
+    <SolidColorBrush x:Key="CardHeaderBackground" Color="#102038" />
+
+    <!-- Interactive Colors -->
+    <Color x:Key="PrimaryAccentColor">#FF8C00</Color>
+    <Color x:Key="PrimaryAccentHoverColor">#FF6A00</Color>
+    <Color x:Key="InfoColorValue">#00BFFF</Color>
+    <Color x:Key="SuccessColorValue">#2E7D32</Color>
+    <Color x:Key="ErrorColorValue">#C62828</Color>
+
+    <!-- Interactive Brushes -->
+    <SolidColorBrush x:Key="PrimaryAccent" Color="{DynamicResource PrimaryAccentColor}" /> <!-- Laranja Premium -->
+    <SolidColorBrush x:Key="PrimaryAccentHover" Color="{DynamicResource PrimaryAccentHoverColor}" /> <!-- Laranja Destaque -->
+    <SolidColorBrush x:Key="InfoColor" Color="{DynamicResource InfoColorValue}" /> <!-- Deep Sky Blue -->
+    <SolidColorBrush x:Key="SuccessColor" Color="{DynamicResource SuccessColorValue}" /> <!-- Green -->
+    <SolidColorBrush x:Key="ErrorColor" Color="{DynamicResource ErrorColorValue}" /> <!-- Red -->
+
+    <!-- Text Brushes -->
+    <SolidColorBrush x:Key="TextPrimary" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="TextSecondary" Color="#A0B2C6" />
+    <SolidColorBrush x:Key="TextDark" Color="#1E2835" />
+
+    <!-- Button Brushes -->
+    <SolidColorBrush x:Key="ButtonBackground" Color="#1C3254" />
+    <SolidColorBrush x:Key="ButtonBorder" Color="{DynamicResource PrimaryAccentColor}" />
+    <SolidColorBrush x:Key="ButtonHover" Color="{DynamicResource PrimaryAccentColor}" />
+
+</ResourceDictionary>

@@ -1,0 +1,456 @@
+<UserControl x:Class="RotinaClone.App.Views.CloneWizardView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:components="clr-namespace:RotinaClone.App.Components"
+             xmlns:vms="clr-namespace:RotinaClone.App.ViewModels"
+             mc:Ignorable="d" 
+             d:DesignHeight="600" d:DesignWidth="800"
+             d:DataContext="{d:DesignInstance Type=vms:CloneWizardViewModel}">
+
+    <UserControl.Resources>
+        <!-- Visibility triggers for steps -->
+        <Style x:Key="Step1PanelStyle" TargetType="Grid">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CurrentStep}" Value="1">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="Step2PanelStyle" TargetType="Grid">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CurrentStep}" Value="2">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="Step3PanelStyle" TargetType="Grid">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CurrentStep}" Value="3">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="Step4PanelStyle" TargetType="Grid">
+            <Setter Property="Visibility" Value="Collapsed" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding CurrentStep}" Value="4">
+                    <Setter Property="Visibility" Value="Visible" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />  <!-- Step Timeline Indicator -->
+            <RowDefinition Height="*" />     <!-- Wizard Page Content Area -->
+            <RowDefinition Height="60" />    <!-- Navigation Controls (Footer) -->
+        </Grid.RowDefinitions>
+
+        <!-- Step Timeline Header -->
+        <Border Grid.Row="0" Style="{DynamicResource GlassCard}" Padding="15" Margin="0,0,0,20">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Step 1 Title -->
+                <TextBlock Grid.Column="0" Text="1. Disco de Origem" HorizontalAlignment="Center" FontSize="12" FontWeight="Bold">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentStep}" Value="1">
+                                    <Setter Property="Foreground" Value="{DynamicResource PrimaryAccent}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Grid.Column="1" Text="➔" Foreground="{DynamicResource TextSecondary}" />
+
+                <!-- Step 2 Title -->
+                <TextBlock Grid.Column="2" Text="2. Disco de Destino" HorizontalAlignment="Center" FontSize="12" FontWeight="Bold">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentStep}" Value="2">
+                                    <Setter Property="Foreground" Value="{DynamicResource PrimaryAccent}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Grid.Column="3" Text="➔" Foreground="{DynamicResource TextSecondary}" />
+
+                <!-- Step 3 Title -->
+                <TextBlock Grid.Column="4" Text="3. Parâmetros" HorizontalAlignment="Center" FontSize="12" FontWeight="Bold">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentStep}" Value="3">
+                                    <Setter Property="Foreground" Value="{DynamicResource PrimaryAccent}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Grid.Column="5" Text="➔" Foreground="{DynamicResource TextSecondary}" />
+
+                <!-- Step 4 Title -->
+                <TextBlock Grid.Column="6" Text="4. Clonagem" HorizontalAlignment="Center" FontSize="12" FontWeight="Bold">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="{DynamicResource TextSecondary}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentStep}" Value="4">
+                                    <Setter Property="Foreground" Value="{DynamicResource PrimaryAccent}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </Border>
+
+        <!-- Main Content Host Panels -->
+        <Grid Grid.Row="1">
+
+            <!-- STEP 1: Select Source Disk -->
+            <Grid Style="{StaticResource Step1PanelStyle}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="Selecione o disco rígido de ORIGEM que deseja clonar:" Foreground="{DynamicResource TextPrimary}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,15" />
+                <ListBox Grid.Row="1" ItemsSource="{Binding AvailableDisks}" SelectedItem="{Binding SelectedSourceDisk}" Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <components:DiskCard Disk="{Binding}" Cursor="Hand" />
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Effect">
+                                                    <Setter.Value>
+                                                        <DropShadowEffect Color="#FF8C00" BlurRadius="12" ShadowDepth="0" Opacity="0.8" />
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+            </Grid>
+
+            <!-- STEP 2: Select Target Disk -->
+            <Grid Style="{StaticResource Step2PanelStyle}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="Selecione o disco rígido de DESTINO para onde os dados serão copiados:" Foreground="{DynamicResource TextPrimary}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,15" />
+                <ListBox Grid.Row="1" ItemsSource="{Binding AvailableDisks}" SelectedItem="{Binding SelectedDestinationDisk}" Background="Transparent" BorderThickness="0">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <components:DiskCard Disk="{Binding}" Cursor="Hand" />
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter Property="Effect">
+                                                    <Setter.Value>
+                                                        <DropShadowEffect Color="#FF8C00" BlurRadius="12" ShadowDepth="0" Opacity="0.8" />
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+            </Grid>
+
+            <!-- STEP 3: Configure and Review options -->
+            <Grid Style="{StaticResource Step3PanelStyle}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="Confirme a operação de clonagem e configure as opções técnicas:" Foreground="{DynamicResource TextPrimary}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,15" />
+                
+                <StackPanel Grid.Row="1">
+                    <!-- Disk mapping summary -->
+                    <Border Style="{DynamicResource GlassCard}" Padding="15" Margin="0,0,0,20" Background="#10000000">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            
+                            <StackPanel Grid.Column="0" HorizontalAlignment="Center">
+                                <TextBlock Text="ORIGEM" Foreground="{DynamicResource TextSecondary}" FontSize="10" FontWeight="Bold" />
+                                <TextBlock Text="{Binding SelectedSourceDisk.Model, FallbackValue='SSD Origem'}" Foreground="{DynamicResource TextPrimary}" FontSize="15" FontWeight="Bold" Margin="0,5" />
+                                <TextBlock Text="{Binding SelectedSourceDisk.TotalSizeGB, StringFormat='{}{0:F1} GB', FallbackValue='120 GB'}" Foreground="{DynamicResource TextSecondary}" FontSize="12" />
+                            </StackPanel>
+
+                            <TextBlock Grid.Column="1" Text="➔" FontSize="28" Foreground="{DynamicResource PrimaryAccent}" VerticalAlignment="Center" />
+
+                            <StackPanel Grid.Column="2" HorizontalAlignment="Center">
+                                <TextBlock Text="DESTINO" Foreground="{DynamicResource TextSecondary}" FontSize="10" FontWeight="Bold" />
+                                <TextBlock Text="{Binding SelectedDestinationDisk.Model, FallbackValue='SSD Destino'}" Foreground="{DynamicResource TextPrimary}" FontSize="15" FontWeight="Bold" Margin="0,5" />
+                                <TextBlock Text="{Binding SelectedDestinationDisk.TotalSizeGB, StringFormat='{}{0:F1} GB', FallbackValue='240 GB'}" Foreground="{DynamicResource TextSecondary}" FontSize="12" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Configurations -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Left options column -->
+                        <StackPanel Grid.Column="0" Margin="0,0,10,0">
+                            <TextBlock Text="Modo de Cópia" Foreground="{DynamicResource TextPrimary}" FontSize="12" FontWeight="Bold" Margin="0,0,0,10" />
+                            <RadioButton Content="Clonagem Inteligente (Recomendado)" IsChecked="{Binding IsIntelligent}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8" ToolTip="Copia apenas os setores utilizados pelo sistema de ficheiros para poupar tempo." />
+                            <RadioButton Content="Clonagem Setor a Setor" IsChecked="{Binding IsSectorBySector}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,15" ToolTip="Copia cada setor individualmente, incluindo setores vazios." />
+
+                            <TextBlock Text="Otimizações de Hardware" Foreground="{DynamicResource TextPrimary}" FontSize="12" FontWeight="Bold" Margin="0,10,0,10" />
+                            <CheckBox Content="Alinhamento automático 4K (Melhora SSDs)" IsChecked="{Binding Align4K}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,8" />
+                            <CheckBox Content="Utilizar VSS (Clonagem Online sem reiniciar)" IsChecked="{Binding UseVss}" Foreground="{DynamicResource TextPrimary}" />
+                        </StackPanel>
+
+                        <!-- Right options column -->
+                        <StackPanel Grid.Column="1" Margin="10,0,0,0">
+                            <TextBlock Text="Segurança e Verificação" Foreground="{DynamicResource TextPrimary}" FontSize="12" FontWeight="Bold" Margin="0,0,0,10" />
+                            <CheckBox Content="Verificação de integridade (SHA-256)" IsChecked="{Binding VerifyIntegrity}" Foreground="{DynamicResource TextPrimary}" Margin="0,0,0,25" />
+
+                            <!-- Safety switch -->
+                            <Border BorderBrush="{DynamicResource PrimaryAccent}" BorderThickness="1" Background="#20FF8C00" CornerRadius="8" Padding="15">
+                                <StackPanel>
+                                    <TextBlock Text="ATENÇÃO: MODO SIMULAÇÃO" Foreground="{DynamicResource PrimaryAccent}" FontSize="12" FontWeight="Bold" Margin="0,0,0,5" />
+                                    <TextBlock Text="A gravação real nos setores de destino está desativada por motivos de segurança. Desmarque abaixo para executar uma clonagem real." 
+                                               Foreground="{DynamicResource TextSecondary}" FontSize="10" TextWrapping="Wrap" Margin="0,0,0,10" />
+                                    <CheckBox Content="Executar apenas Simulação de Segurança" IsChecked="{Binding IsSimulation}" Foreground="{DynamicResource TextPrimary}" FontWeight="SemiBold" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+
+            <!-- STEP 4: Live Cloning Progress -->
+            <Grid Style="{StaticResource Step4PanelStyle}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <!-- Progress Header -->
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <TextBlock Text="{Binding CurrentOperationText, FallbackValue='Copiando Setor 1208...'}" Foreground="{DynamicResource TextPrimary}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <TextBlock Text="Estado: " Foreground="{DynamicResource TextSecondary}" FontSize="12" />
+                        <TextBlock Text="{Binding StatusText, FallbackValue='Em Execução'}" Foreground="{DynamicResource PrimaryAccent}" FontSize="12" FontWeight="Bold" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Progress Bar -->
+                <Grid Grid.Row="1" Margin="0,5,0,15">
+                    <ProgressBar Height="24" Minimum="0" Maximum="100" Value="{Binding ProgressPercent}">
+                        <ProgressBar.Foreground>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                <GradientStop Color="{DynamicResource WindowBgColor2}" Offset="0" />
+                                <GradientStop Color="{DynamicResource PrimaryAccentColor}" Offset="1" />
+                            </LinearGradientBrush>
+                        </ProgressBar.Foreground>
+                    </ProgressBar>
+                    <TextBlock Text="{Binding ProgressPercent, StringFormat='{}{0}%'}" Foreground="{DynamicResource TextPrimary}" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Grid>
+
+                <!-- Metrics Widgets -->
+                <Grid Grid.Row="2" Margin="0,0,0,15">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Speed -->
+                    <Border Grid.Column="0" Style="{DynamicResource GlassCard}" Margin="0,0,8,0" Padding="10">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="VELOCIDADE" Foreground="{DynamicResource TextSecondary}" FontSize="9" FontWeight="Bold" />
+                            <TextBlock Text="{Binding SpeedText, FallbackValue='145.2 MB/s'}" Foreground="{DynamicResource TextPrimary}" FontSize="15" FontWeight="Bold" Margin="0,4" />
+                        </StackPanel>
+                    </Border>
+                    <!-- Elapsed Time -->
+                    <Border Grid.Column="1" Style="{DynamicResource GlassCard}" Margin="0,0,8,0" Padding="10">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="TEMPO DECORRIDO" Foreground="{DynamicResource TextSecondary}" FontSize="9" FontWeight="Bold" />
+                            <TextBlock Text="{Binding ElapsedTimeText, FallbackValue='00:04:12'}" Foreground="{DynamicResource TextPrimary}" FontSize="15" FontWeight="Bold" Margin="0,4" />
+                        </StackPanel>
+                    </Border>
+                    <!-- Remaining Time -->
+                    <Border Grid.Column="2" Style="{DynamicResource GlassCard}" Margin="0,0,8,0" Padding="10">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="RESTANTE ESTIMADO" Foreground="{DynamicResource TextSecondary}" FontSize="9" FontWeight="Bold" />
+                            <TextBlock Text="{Binding RemainingTimeText, FallbackValue='00:08:45'}" Foreground="{DynamicResource TextPrimary}" FontSize="15" FontWeight="Bold" Margin="0,4" />
+                        </StackPanel>
+                    </Border>
+                    <!-- Bytes Copied -->
+                    <Border Grid.Column="3" Style="{DynamicResource GlassCard}" Padding="10">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="COPADO / TOTAL" Foreground="{DynamicResource TextSecondary}" FontSize="9" FontWeight="Bold" />
+                            <TextBlock Text="42.8 GB / 120 GB" Foreground="{DynamicResource TextPrimary}" FontSize="12" FontWeight="Bold" Margin="0,6" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Speed chart + logs -->
+                <Grid Grid.Row="3">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="380" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    
+                    <!-- Performance Speed Graph -->
+                    <Border Grid.Column="0" Style="{DynamicResource GlassCard}" Padding="10" Margin="0,0,10,0">
+                        <components:DiskChart x:Name="CloningSpeedChart" Height="140" />
+                    </Border>
+
+                    <!-- Real-time logs console -->
+                    <Border Grid.Column="1" Style="{DynamicResource GlassCard}" Padding="10" Background="#20000000">
+                        <TextBox Text="{Binding OperationLogs}" FontFamily="Consolas" FontSize="9.5" 
+                                 Foreground="#A0FF8C00" Background="Transparent" BorderThickness="0" 
+                                 IsReadOnly="True" VerticalScrollBarVisibility="Auto" TextChanged="TextBox_TextChanged" />
+                    </Border>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <!-- Navigation Footer (Footer) -->
+        <Border Grid.Row="2" BorderBrush="{DynamicResource CardBorder}" BorderThickness="0,1.5,0,0" Margin="0,10,0,0">
+            <Grid VerticalAlignment="Center">
+                <!-- Back Button -->
+                <Button Content="Anterior" HorizontalAlignment="Left" Width="120" Command="{Binding BackCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentStep}" Value="1">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding CurrentStep}" Value="4">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Next Button -->
+                <Button Content="Seguinte" HorizontalAlignment="Right" Width="120" Command="{Binding NextCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding CurrentStep}" Value="1" />
+                                        <Condition Binding="{Binding CanNavigateNext}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding CurrentStep}" Value="2" />
+                                        <Condition Binding="{Binding CanNavigateNext}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Start Cloning Button -->
+                <Button Content="Iniciar Clonagem" HorizontalAlignment="Right" Width="140" Command="{Binding StartCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource AccentButton}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentStep}" Value="3">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Cancel / Stop Button -->
+                <Button Content="Parar Cópia" Background="{DynamicResource ErrorColor}" BorderBrush="{DynamicResource ErrorColor}" HorizontalAlignment="Right" Width="120" Command="{Binding CancelCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding CurrentStep}" Value="4" />
+                                        <Condition Binding="{Binding IsCloningRunning}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+
+                <!-- Finished Close Button -->
+                <Button Content="Fechar" HorizontalAlignment="Right" Width="120" Command="{Binding BackCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource AccentButton}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <MultiDataTrigger>
+                                    <MultiDataTrigger.Conditions>
+                                        <Condition Binding="{Binding CurrentStep}" Value="4" />
+                                        <Condition Binding="{Binding IsCloningComplete}" Value="True" />
+                                    </MultiDataTrigger.Conditions>
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </MultiDataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

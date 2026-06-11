@@ -1,0 +1,23 @@
+# Visual Studio / .NET Core
+[Db]in/
+[Oo]bj/
+*.user
+*.suo
+.vs/
+.idea/
+.vscode/
+
+# Publish and build directories
+publish_portable/
+publish_portable_*/
+publish_release/
+publish/
+
+# Log files
+*.log
+log.txt
+
+# OS-specific
+Thumbs.db
+ehthumbs.db
+Desktop.ini
