@@ -141,6 +141,7 @@ namespace RotinaClone.App.ViewModels
                     break;
                 case "Clone":
                     CurrentViewModel = CloneWizardVM;
+                    _ = CloneWizardVM.LoadDisksAsync();
                     break;
                 case "Backup":
                     CurrentViewModel = BackupManagerVM;

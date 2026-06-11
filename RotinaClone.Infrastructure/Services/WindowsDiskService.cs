@@ -131,7 +131,7 @@ namespace RotinaClone.Infrastructure.Services
                 }
 
                 // Get partitions on this disk
-                string query = $"ASSOCIATORS OF {{Win32_DiskDrive.DeviceID='\\\\.\\\\PHYSICALDRIVE{disk.Index}'}} WHERE AssocClass = Win32_DiskDriveToDiskPartition";
+                string query = $"SELECT * FROM Win32_DiskPartition WHERE DiskIndex = {disk.Index}";
                 using (var searcher = new ManagementObjectSearcher(query))
                 using (var collection = searcher.Get())
                 {

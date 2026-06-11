@@ -146,9 +146,9 @@ namespace RotinaClone.Application.Services
         {
             try
             {
-                // Run PowerShell to create a shadow copy via WMI class Win32_ShadowCopy
+                // Run PowerShell to create a shadow copy via WMI class Win32_ShadowCopy with a 3-second timeout
                 string script = $"$sc = (Get-WmiObject -List -Name Win32_ShadowCopy).Create('{driveLetter}:\\', 'ClientAccessible'); (Get-WmiObject Win32_ShadowCopy | Where-Object {{ $_.ID -eq $sc.ShadowID }}).DeviceObject";
-                var result = await PowerShellRunner.RunPowerShellScriptAsync(script);
+                var result = await PowerShellRunner.RunPowerShellScriptAsync(script, 3000);
                 if (result.ExitCode == 0 && !string.IsNullOrEmpty(result.Output))
                 {
                     return result.Output.Trim();

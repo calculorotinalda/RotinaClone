@@ -17,7 +17,9 @@
     <Nullable>enable</Nullable>
     <ApplicationIcon>icons\icon.ico</ApplicationIcon>
     <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
+
   <ItemGroup>
     <None Include="icons\icon.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

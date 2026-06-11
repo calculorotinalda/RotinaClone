@@ -128,7 +128,7 @@ namespace RotinaClone.App.ViewModels
             }
         }
 
-        private async Task LoadDisksAsync()
+        public async Task LoadDisksAsync()
         {
             var list = await _diskService.GetDisksAsync();
             App.Current?.Dispatcher?.Invoke(() =>

@@ -7,7 +7,11 @@ namespace RotinaClone.Infrastructure.Native
 {
     public static class PowerShellRunner
     {
-        public static async Task<(int ExitCode, string Output, string Error)> RunCommandAsync(string command, string args = "")
+        public static async Task<(int ExitCode, string Output, string Error)> RunCommandAsync(
+            string command, 
+            string args = "", 
+            int timeoutMs = 10000, 
+            Action<string>? outputLineCallback = null)
         {
             var tcs = new TaskCompletionSource<(int ExitCode, string Output, string Error)>();
             
@@ -29,17 +33,25 @@ namespace RotinaClone.Infrastructure.Native
 
             process.OutputDataReceived += (s, e) =>
             {
-                if (e.Data != null) outputBuilder.AppendLine(e.Data);
+                if (e.Data != null)
+                {
+                    outputBuilder.AppendLine(e.Data);
+                    outputLineCallback?.Invoke(e.Data);
+                }
             };
 
             process.ErrorDataReceived += (s, e) =>
             {
-                if (e.Data != null) errorBuilder.AppendLine(e.Data);
+                if (e.Data != null)
+                {
+                    errorBuilder.AppendLine(e.Data);
+                    outputLineCallback?.Invoke($"[STDERR] {e.Data}");
+                }
             };
 
             process.Exited += (s, e) =>
             {
-                tcs.SetResult((process.ExitCode, outputBuilder.ToString(), errorBuilder.ToString()));
+                tcs.TrySetResult((process.ExitCode, outputBuilder.ToString(), errorBuilder.ToString()));
                 process.Dispose();
             };
 
@@ -48,21 +60,39 @@ namespace RotinaClone.Infrastructure.Native
                 process.Start();
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
+
+                var delayTask = Task.Delay(timeoutMs);
+                var completedTask = await Task.WhenAny(tcs.Task, delayTask);
+                if (completedTask == delayTask)
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                        {
+                            process.Kill();
+                        }
+                    }
+                    catch { }
+                    return (-1, string.Empty, "Command timed out");
+                }
             }
             catch (Exception ex)
             {
-                tcs.SetResult((-1, string.Empty, ex.Message));
+                tcs.TrySetResult((-1, string.Empty, ex.Message));
             }
 
             return await tcs.Task;
         }
 
-        public static async Task<(int ExitCode, string Output, string Error)> RunPowerShellScriptAsync(string scriptContent)
+        public static async Task<(int ExitCode, string Output, string Error)> RunPowerShellScriptAsync(
+            string scriptContent, 
+            int timeoutMs = 10000, 
+            Action<string>? outputLineCallback = null)
         {
             // Encode the script content in Base64 to avoid quote-escaping issues
             byte[] bytes = Encoding.Unicode.GetBytes(scriptContent);
             string base64Script = Convert.ToBase64String(bytes);
-            return await RunCommandAsync("powershell.exe", $"-NoProfile -NonInteractive -EncodedCommand {base64Script}");
+            return await RunCommandAsync("powershell.exe", $"-NoProfile -NonInteractive -EncodedCommand {base64Script}", timeoutMs, outputLineCallback);
         }
     }
 }

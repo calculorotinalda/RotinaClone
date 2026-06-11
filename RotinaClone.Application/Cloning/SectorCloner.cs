@@ -24,7 +24,7 @@ namespace RotinaClone.Application.Cloning
             };
             progressCallback(session);
 
-            await Task.Run(() =>
+            await Task.Run(async () =>
             {
                 string sourcePath = $"\\\\.\\\\PhysicalDrive{options.SourceDiskIndex}";
                 string destPath = $"\\\\.\\\\PhysicalDrive{options.DestinationDiskIndex}";
@@ -113,9 +113,10 @@ namespace RotinaClone.Application.Cloning
                 }
                 catch (Exception ex)
                 {
-                    // Fallback to simulation if handles cannot be acquired (UAC issues or lock conflicts)
-                    session.LogMessage = $"Raw handle copy failed: {ex.Message}. Falling back to sector simulation.";
-                    RunSimulation(options, progressCallback, cancellationToken, session);
+                    session.LogMessage = $"[WARNING] Raw block copy failed: {ex.Message}. Falling back to file-level cloning.";
+                    progressCallback(session);
+                    var cloner = new IntelligentCloner();
+                    await cloner.ExecuteAsync(options, progressCallback, cancellationToken);
                 }
             });
         }
