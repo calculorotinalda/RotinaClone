@@ -18,68 +18,19 @@ namespace RotinaClone.Infrastructure.Services
                 var disks = new List<DiskInfo>();
                 var diskMap = new Dictionary<int, DiskInfo>();
 
+                // 1. Query Win32_DiskDrive first (always succeeds and returns all physical drives including USB)
                 try
                 {
-                    // Query WMI MSFT_PhysicalDisk from root\Microsoft\Windows\Storage
-                    // to accurately identify SSD/NVMe/HDD and health
-                    using (var searcher = new ManagementObjectSearcher(@"root\Microsoft\Windows\Storage", "SELECT * FROM MSFT_PhysicalDisk"))
+                    using (var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_DiskDrive"))
                     using (var collection = searcher.Get())
                     {
                         foreach (ManagementObject drive in collection)
                         {
                             try
                             {
-                                int index = Convert.ToInt32(drive["DeviceId"]);
+                                int index = Convert.ToInt32(drive["Index"]);
                                 string model = drive["Model"]?.ToString()?.Trim() ?? "Unknown Disk";
                                 string serial = drive["SerialNumber"]?.ToString()?.Trim() ?? string.Empty;
-                                long size = Convert.ToInt64(drive["Size"]);
-                                
-                                ushort mediaType = Convert.ToUInt16(drive["MediaType"]); // 3 = HDD, 4 = SSD, 0 = Unspecified
-                                ushort busType = Convert.ToUInt16(drive["BusType"]); // 17 = NVMe, 8 = SATA SSD, 7 = USB, etc.
-                                ushort health = Convert.ToUInt16(drive["HealthStatus"]); // 0 = Healthy, 1 = Warning, 2 = Critical
-
-                                string interfaceTypeStr = "HDD";
-                                if (mediaType == 4) interfaceTypeStr = "SSD";
-                                if (busType == 17) interfaceTypeStr = "NVMe";
-                                else if (busType == 7) interfaceTypeStr = "USB";
-
-                                string healthStr = "Healthy";
-                                if (health == 1) healthStr = "Warning";
-                                else if (health == 2) healthStr = "Critical";
-
-                                var disk = new DiskInfo
-                                {
-                                    Index = index,
-                                    Model = model,
-                                    SerialNumber = serial,
-                                    InterfaceType = interfaceTypeStr,
-                                    TotalSize = size,
-                                    HealthStatus = healthStr
-                                };
-
-                                disks.Add(disk);
-                                diskMap[index] = disk;
-                            }
-                            catch
-                            {
-                                // Fallback or skip
-                            }
-                        }
-                    }
-                }
-                catch
-                {
-                    // Fallback to Win32_DiskDrive if root\Microsoft\Windows\Storage fails
-                    try
-                    {
-                        using (var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_DiskDrive"))
-                        using (var collection = searcher.Get())
-                        {
-                            foreach (ManagementObject drive in collection)
-                            {
-                                int index = Convert.ToInt32(drive["Index"]);
-                                string model = drive["Model"]?.ToString() ?? "Unknown Disk";
-                                string serial = drive["SerialNumber"]?.ToString() ?? string.Empty;
                                 long size = Convert.ToInt64(drive["Size"]);
                                 string type = drive["InterfaceType"]?.ToString() ?? "SATA";
 
@@ -88,7 +39,7 @@ namespace RotinaClone.Infrastructure.Services
                                     Index = index,
                                     Model = model,
                                     SerialNumber = serial,
-                                    InterfaceType = type.Contains("USB") ? "USB" : "HDD/SSD",
+                                    InterfaceType = type.Contains("USB", StringComparison.OrdinalIgnoreCase) ? "USB" : "HDD/SSD",
                                     TotalSize = size,
                                     HealthStatus = "Healthy"
                                 };
@@ -96,12 +47,58 @@ namespace RotinaClone.Infrastructure.Services
                                 disks.Add(disk);
                                 diskMap[index] = disk;
                             }
+                            catch
+                            {
+                                // Skip individual failed drive parse
+                            }
                         }
                     }
-                    catch
+                }
+                catch
+                {
+                    // Ignore Win32_DiskDrive query failures
+                }
+
+                // 2. Query MSFT_PhysicalDisk to enrich with MediaType (SSD vs HDD), BusType, and HealthStatus
+                try
+                {
+                    using (var searcher = new ManagementObjectSearcher(@"root\Microsoft\Windows\Storage", "SELECT * FROM MSFT_PhysicalDisk"))
+                    using (var collection = searcher.Get())
                     {
-                        // Ignore
+                        foreach (ManagementObject drive in collection)
+                        {
+                            try
+                            {
+                                int index = Convert.ToInt32(drive["DeviceId"]);
+                                if (diskMap.TryGetValue(index, out var disk))
+                                {
+                                    ushort mediaType = Convert.ToUInt16(drive["MediaType"]); // 3 = HDD, 4 = SSD, 0 = Unspecified
+                                    ushort busType = Convert.ToUInt16(drive["BusType"]); // 17 = NVMe, 8 = SATA SSD, 7 = USB, etc.
+                                    ushort health = Convert.ToUInt16(drive["HealthStatus"]); // 0 = Healthy, 1 = Warning, 2 = Critical
+
+                                    // Enrich InterfaceType
+                                    if (busType == 17) disk.InterfaceType = "NVMe";
+                                    else if (busType == 7) disk.InterfaceType = "USB";
+                                    else if (mediaType == 4) disk.InterfaceType = "SSD";
+                                    else if (mediaType == 3) disk.InterfaceType = "HDD";
+
+                                    // Enrich HealthStatus
+                                    string healthStr = "Healthy";
+                                    if (health == 1) healthStr = "Warning";
+                                    else if (health == 2) healthStr = "Critical";
+                                    disk.HealthStatus = healthStr;
+                                }
+                            }
+                            catch
+                            {
+                                // Skip enrichment for this item
+                            }
+                        }
                     }
+                }
+                catch
+                {
+                    // Ignore MSFT_PhysicalDisk query failures (e.g., on Windows 7)
                 }
 
                 // Query Partitions and Drive Letters

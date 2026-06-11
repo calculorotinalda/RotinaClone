@@ -73,7 +73,16 @@ try {
     Copy-Item "icons\icon.ico" -Destination "$publishFolder\icons"
     Copy-Item "icons\icon.png" -Destination "$publishFolder\icons"
     
-    Log-Message "Publicação portátil concluída na pasta .\$publishFolder"
+    # Maintain a standard 'publish_portable' directory for Inno Setup GUI/scripts
+    Log-Message "A atualizar a pasta padrão .\publish_portable..."
+    $standardPublishFolder = "publish_portable"
+    if (Test-Path $standardPublishFolder) {
+        Remove-Item -Recurse -Force $standardPublishFolder -ErrorAction SilentlyContinue
+    }
+    New-Item -ItemType Directory -Force -Path $standardPublishFolder | Out-Null
+    Copy-Item -Path "$publishFolder\*" -Destination $standardPublishFolder -Recurse -Force
+    
+    Log-Message "Publicação portátil concluída na pasta .\$publishFolder e copiada para .\$standardPublishFolder"
 
     # Step 5: Compile Inno Setup Installer
     Log-Message "Passo 5/6: Compilando instalador profissional (Inno Setup)..."

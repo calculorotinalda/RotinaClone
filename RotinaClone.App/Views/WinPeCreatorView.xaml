@@ -1,4 +1,4 @@
-﻿<UserControl x:Class="RotinaClone.App.Views.WinPeCreatorView"
+<UserControl x:Class="RotinaClone.App.Views.WinPeCreatorView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
@@ -49,7 +49,7 @@
                         <TextBlock Text="Caminho do ficheiro ISO:" Foreground="{DynamicResource TextSecondary}" FontSize="11" Margin="0,0,0,5" />
                         <TextBox Text="{Binding IsoOutputPath}" Background="#10FFFFFF" BorderBrush="{DynamicResource CardBorder}" Foreground="{DynamicResource TextPrimary}" Padding="6" Margin="0,0,0,12" />
 
-                        <Button Content="Gerar Imagem ISO" Command="{Binding CreateIsoCommand}" IsEnabled="{Binding IsReadyToBuild}" />
+                        <Button Content="Gerar Imagem ISO" Style="{DynamicResource AccentButton}" Command="{Binding CreateIsoCommand}" IsEnabled="{Binding IsReadyToBuild}" />
                     </StackPanel>
                 </Border>
             </StackPanel>
