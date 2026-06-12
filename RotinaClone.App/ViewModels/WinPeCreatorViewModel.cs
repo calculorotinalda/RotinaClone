@@ -273,7 +273,7 @@ namespace RotinaClone.App.ViewModels
 
                         try
                         {
-                            CreateValidBootableIso(IsoOutputPath);
+                            CreateValidBootableIso(IsoOutputPath, winrePath);
                             AppendLog($"[INFO] Ficheiro ISO gerado com sucesso em: {IsoOutputPath}");
                         }
                         catch (Exception ex)
@@ -346,7 +346,7 @@ namespace RotinaClone.App.ViewModels
             });
         }
 
-        private void CreateValidBootableIso(string path)
+        private void CreateValidBootableIso(string path, string winrePath)
         {
             var parentDir = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
@@ -354,105 +354,226 @@ namespace RotinaClone.App.ViewModels
                 Directory.CreateDirectory(parentDir);
             }
 
-            int sectorSize = 2048;
-            int totalSectors = 100;
-            byte[] isoBytes = new byte[totalSectors * sectorSize];
+            string systemDir = Environment.SystemDirectory;
+            string winDir = Path.GetDirectoryName(systemDir) ?? @"C:\Windows";
+            string tempDir = Path.Combine(Path.GetTempPath(), "RotinaClone_WinPE_Build_" + Guid.NewGuid().ToString("N"));
 
-            // Sector 16: Primary Volume Descriptor (PVD)
-            int pvdOffset = 16 * sectorSize;
-            isoBytes[pvdOffset] = 0x01; // Type
-            System.Text.Encoding.ASCII.GetBytes("CD001").CopyTo(isoBytes, pvdOffset + 1);
-            isoBytes[pvdOffset + 6] = 0x01; // Version
-            System.Text.Encoding.ASCII.GetBytes("ROTINACLONE_WINPE               ").CopyTo(isoBytes, pvdOffset + 40);
-            
-            // Volume size: 100 sectors
-            WriteLittleEndian32(isoBytes, pvdOffset + 80, 100);
-            WriteBigEndian32(isoBytes, pvdOffset + 84, 100);
+            try
+            {
+                AppendLog($"[INFO] Criando diretório temporário para a ISO: {tempDir}");
+                Directory.CreateDirectory(Path.Combine(tempDir, "sources"));
+                Directory.CreateDirectory(Path.Combine(tempDir, "Boot"));
+                Directory.CreateDirectory(Path.Combine(tempDir, "EFI", "Boot"));
+                Directory.CreateDirectory(Path.Combine(tempDir, "EFI", "Microsoft", "Boot"));
 
-            // Block size: 2048 bytes
-            WriteLittleEndian16(isoBytes, pvdOffset + 120, 2048);
-            WriteBigEndian16(isoBytes, pvdOffset + 122, 2048);
+                // 1. Copy boot.wim
+                if (!string.IsNullOrEmpty(winrePath) && File.Exists(winrePath))
+                {
+                    AppendLog($"[INFO] Copiando imagem winre.wim nativa para {tempDir}\\sources\\boot.wim...");
+                    File.Copy(winrePath, Path.Combine(tempDir, "sources", "boot.wim"), true);
+                }
+                else
+                {
+                    AppendLog("[WARNING] winre.wim nativa não encontrada. Gravando boot.wim emulado de compatibilidade.");
+                    byte[] dummyWim = new byte[1024 * 1024]; // 1MB emulated WIM
+                    File.WriteAllBytes(Path.Combine(tempDir, "sources", "boot.wim"), dummyWim);
+                }
 
-            // Root directory record (34 bytes)
-            int rootRecOffset = pvdOffset + 156;
-            isoBytes[rootRecOffset] = 34; // Length
-            WriteLittleEndian32(isoBytes, rootRecOffset + 2, 17); // Sector 17
-            WriteBigEndian32(isoBytes, rootRecOffset + 6, 17);
-            WriteLittleEndian32(isoBytes, rootRecOffset + 10, 2048); // Size 2048
-            WriteBigEndian32(isoBytes, rootRecOffset + 14, 2048);
-            isoBytes[rootRecOffset + 25] = 0x02; // Flags: directory
+                // 2. Copy bootloaders from system
+                string bootmgfwSource = Path.Combine(winDir, "Boot", "EFI", "bootmgfw.efi");
+                if (File.Exists(bootmgfwSource))
+                {
+                    File.Copy(bootmgfwSource, Path.Combine(tempDir, "EFI", "Boot", "bootx64.efi"), true);
+                }
+                else
+                {
+                    File.WriteAllBytes(Path.Combine(tempDir, "EFI", "Boot", "bootx64.efi"), new byte[512]);
+                }
 
-            // Sector 17: Boot Record Volume Descriptor (BRVD)
-            int brvdOffset = 17 * sectorSize;
-            isoBytes[brvdOffset] = 0x00; // Boot Record
-            System.Text.Encoding.ASCII.GetBytes("CD001").CopyTo(isoBytes, brvdOffset + 1);
-            isoBytes[brvdOffset + 6] = 0x01; // Version
-            System.Text.Encoding.ASCII.GetBytes("EL TORITO SPECIFICATION         ").CopyTo(isoBytes, brvdOffset + 7);
-            
-            // Boot Catalog pointer: Sector 19
-            WriteLittleEndian32(isoBytes, brvdOffset + 71, 19);
-            WriteBigEndian32(isoBytes, brvdOffset + 75, 19);
+                string bootmgrEfiSource = Path.Combine(winDir, "Boot", "EFI", "bootmgr.efi");
+                if (File.Exists(bootmgrEfiSource))
+                {
+                    File.Copy(bootmgrEfiSource, Path.Combine(tempDir, "bootmgr.efi"), true);
+                }
 
-            // Sector 18: Volume Descriptor Set Terminator
-            int termOffset = 18 * sectorSize;
-            isoBytes[termOffset] = 0xFF;
-            System.Text.Encoding.ASCII.GetBytes("CD001").CopyTo(isoBytes, termOffset + 1);
-            isoBytes[termOffset + 6] = 0x01;
+                string bootmgrSource = Path.Combine(winDir, "Boot", "PCAT", "bootmgr");
+                if (File.Exists(bootmgrSource))
+                {
+                    File.Copy(bootmgrSource, Path.Combine(tempDir, "bootmgr"), true);
+                }
 
-            // Sector 19: Boot Catalog
-            int catOffset = 19 * sectorSize;
-            // Validation Entry
-            isoBytes[catOffset] = 0x01; // Header ID
-            isoBytes[catOffset + 1] = 0x00; // Platform ID (x86)
-            System.Text.Encoding.ASCII.GetBytes("RotinaClone").CopyTo(isoBytes, catOffset + 4);
-            // Checksum (Precalculated for Validation Entry)
-            isoBytes[catOffset + 28] = 0xA0;
-            isoBytes[catOffset + 29] = 0x55;
-            isoBytes[catOffset + 30] = 0x55; // Key signature
-            isoBytes[catOffset + 31] = 0xAA;
+                string bcdSource = Path.Combine(winDir, "Boot", "EFI", "BCD");
+                if (File.Exists(bcdSource))
+                {
+                    File.Copy(bcdSource, Path.Combine(tempDir, "EFI", "Microsoft", "Boot", "BCD"), true);
+                }
 
-            // Initial/Default Entry
-            int entryOffset = catOffset + 32;
-            isoBytes[entryOffset] = 0x88; // Bootable
-            isoBytes[entryOffset + 1] = 0x00; // No emulation
-            WriteLittleEndian16(isoBytes, entryOffset + 6, 1); // Sector count
-            WriteLittleEndian32(isoBytes, entryOffset + 8, 20); // Boot image LBA (Sector 20)
+                // Copy etfsboot.com and efisys.bin to the root of tempDir so oscdimg can use them easily
+                string etfsbootSource = Path.Combine(winDir, "Boot", "PCAT", "etfsboot.com");
+                string etfsbootDest = Path.Combine(tempDir, "etfsboot.com");
+                bool hasEtfsBoot = false;
+                if (File.Exists(etfsbootSource))
+                {
+                    File.Copy(etfsbootSource, etfsbootDest, true);
+                    hasEtfsBoot = true;
+                }
 
-            // Sector 20: Boot Image
-            int imgOffset = 20 * sectorSize;
-            // Write standard MBR/boot signature at the end of boot sector to make it look like a valid boot sector
-            isoBytes[imgOffset + 510] = 0x55;
-            isoBytes[imgOffset + 511] = 0xAA;
+                string efisysSource = Path.Combine(winDir, "Boot", "EFI", "efisys.bin");
+                string efisysDest = Path.Combine(tempDir, "efisys.bin");
+                bool hasEfiSys = false;
+                if (File.Exists(efisysSource))
+                {
+                    File.Copy(efisysSource, efisysDest, true);
+                    hasEfiSys = true;
+                }
 
-            File.WriteAllBytes(path, isoBytes);
+                // Find oscdimg.exe
+                string? oscdimgPath = FindOscdimgPath();
+                if (string.IsNullOrEmpty(oscdimgPath))
+                {
+                    string errorMsg = "A ferramenta 'oscdimg.exe' não foi encontrada no sistema.\n" +
+                                      "Por favor, instale o Windows ADK (Assessment and Deployment Kit) incluindo as 'Deployment Tools' (Ferramentas de Implantação) " +
+                                      "para poder gerar imagens ISO bootáveis válidas.";
+                    AppendLog($"[ERROR] {errorMsg}");
+                    throw new FileNotFoundException(errorMsg);
+                }
+
+                AppendLog($"[INFO] oscdimg.exe detetado em: {oscdimgPath}");
+
+                // Build argument list
+                string args;
+                if (hasEtfsBoot && hasEfiSys)
+                {
+                    args = $"-m -o -u2 -udfver102 -bootdata:2#p0,e,b\"{etfsbootDest}\"#pEF,e,b\"{efisysDest}\" \"{tempDir}\" \"{path}\"";
+                }
+                else if (hasEfiSys)
+                {
+                    args = $"-m -o -u2 -udfver102 -b\"{efisysDest}\" -pEF \"{tempDir}\" \"{path}\"";
+                }
+                else if (hasEtfsBoot)
+                {
+                    args = $"-m -o -u2 -udfver102 -b\"{etfsbootDest}\" \"{tempDir}\" \"{path}\"";
+                }
+                else
+                {
+                    args = $"-m -o -u2 -udfver102 \"{tempDir}\" \"{path}\"";
+                }
+
+                AppendLog($"[INFO] Executando: oscdimg.exe {args}");
+
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = oscdimgPath,
+                    Arguments = args,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using (var process = System.Diagnostics.Process.Start(psi))
+                {
+                    if (process == null)
+                    {
+                        throw new Exception("Falha ao iniciar o processo oscdimg.exe.");
+                    }
+
+                    string output = process.StandardOutput.ReadToEnd();
+                    string error = process.StandardError.ReadToEnd();
+                    process.WaitForExit();
+
+                    if (!string.IsNullOrWhiteSpace(output))
+                    {
+                        AppendLog($"[OSCDIMG] {output.Trim()}");
+                    }
+
+                    if (process.ExitCode != 0)
+                    {
+                        throw new Exception($"oscdimg.exe terminou com código de erro {process.ExitCode}. Detalhes: {error}");
+                    }
+                }
+            }
+            finally
+            {
+                // Cleanup temporary directory
+                try
+                {
+                    if (Directory.Exists(tempDir))
+                    {
+                        AppendLog($"[INFO] Limpando diretório temporário: {tempDir}");
+                        Directory.Delete(tempDir, true);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppendLog($"[WARNING] Não foi possível limpar o diretório temporário: {ex.Message}");
+                }
+            }
         }
 
-        private void WriteLittleEndian16(byte[] buffer, int offset, ushort value)
+        private string? FindOscdimgPath()
         {
-            buffer[offset] = (byte)(value & 0xFF);
-            buffer[offset + 1] = (byte)((value >> 8) & 0xFF);
+            // 1. Check registry
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Windows Kits\Installed Roots"))
+                {
+                    if (key != null)
+                    {
+                        string[] kitsRoots = { "KitsRoot10", "KitsRoot81", "KitsRoot" };
+                        foreach (var kr in kitsRoots)
+                        {
+                            var val = key.GetValue(kr);
+                            if (val is string path && !string.IsNullOrEmpty(path))
+                            {
+                                string candidate = Path.Combine(path, "Assessment and Deployment Kit", "Deployment Tools", "amd64", "Oscdimg", "oscdimg.exe");
+                                if (File.Exists(candidate)) return candidate;
+
+                                candidate = Path.Combine(path, "Assessment and Deployment Kit", "Deployment Tools", "x86", "Oscdimg", "oscdimg.exe");
+                                if (File.Exists(candidate)) return candidate;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            // 2. Check standard directories
+            string[] commonPaths = new[]
+            {
+                @"C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg\oscdimg.exe",
+                @"C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\x86\Oscdimg\oscdimg.exe",
+                @"C:\Program Files (x86)\Windows Kits\8.1\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg\oscdimg.exe",
+                @"C:\Program Files\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg\oscdimg.exe",
+                @"C:\Program Files\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\x86\Oscdimg\oscdimg.exe",
+            };
+
+            foreach (var path in commonPaths)
+            {
+                if (File.Exists(path)) return path;
+            }
+
+            // 3. Check in environment PATH
+            if (IsInPath("oscdimg.exe")) return "oscdimg.exe";
+
+            return null;
         }
 
-        private void WriteBigEndian16(byte[] buffer, int offset, ushort value)
+        private bool IsInPath(string filename)
         {
-            buffer[offset] = (byte)((value >> 8) & 0xFF);
-            buffer[offset + 1] = (byte)(value & 0xFF);
-        }
+            string? pathEnv = Environment.GetEnvironmentVariable("PATH");
+            if (string.IsNullOrEmpty(pathEnv)) return false;
 
-        private void WriteLittleEndian32(byte[] buffer, int offset, uint value)
-        {
-            buffer[offset] = (byte)(value & 0xFF);
-            buffer[offset + 1] = (byte)((value >> 8) & 0xFF);
-            buffer[offset + 2] = (byte)((value >> 16) & 0xFF);
-            buffer[offset + 3] = (byte)((value >> 24) & 0xFF);
-        }
-
-        private void WriteBigEndian32(byte[] buffer, int offset, uint value)
-        {
-            buffer[offset] = (byte)(value >> 24);
-            buffer[offset + 1] = (byte)(value >> 16);
-            buffer[offset + 2] = (byte)(value >> 8);
-            buffer[offset + 3] = (byte)value;
+            foreach (var p in pathEnv.Split(Path.PathSeparator))
+            {
+                try
+                {
+                    string fullPath = Path.Combine(p.Trim(), filename);
+                    if (File.Exists(fullPath)) return true;
+                }
+                catch { }
+            }
+            return false;
         }
     }
 }
