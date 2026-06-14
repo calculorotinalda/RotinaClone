@@ -154,6 +154,8 @@ namespace RotinaClone.App.ViewModels
             StatusText = "A extrair ficheiros do ambiente WinPE...";
             BuildLogs = $"[INFO] Início do processo: {DateTime.Now:HH:mm:ss}\n";
 
+            string wimCustomDir = string.Empty;
+
             try
             {
                 await Task.Run(async () =>
@@ -172,12 +174,29 @@ namespace RotinaClone.App.ViewModels
                     }
                     await Task.Delay(1500);
 
-                    // Step 2: Extracting files
-                    UpdateProgress(40, "A montar imagem VIM e a injetar controladores de armazenamento/RAID...");
-                    AppendLog("[INFO] Executando comando DISM /Mount-Image...");
-                    await Task.Delay(2000);
-                    AppendLog("[INFO] Injetando controladores: rotinaclone_nvme.inf, raid_storage.inf");
-                    await Task.Delay(1000);
+                    string wimToDeploy = winrePath;
+
+                    if (!string.IsNullOrEmpty(winrePath) && File.Exists(winrePath))
+                    {
+                        wimCustomDir = Path.Combine(Path.GetTempPath(), "RotinaClone_WIM_Custom_" + Guid.NewGuid().ToString("N"));
+                        Directory.CreateDirectory(wimCustomDir);
+                        string customWimPath = Path.Combine(wimCustomDir, "boot.wim");
+
+                        AppendLog($"[INFO] Copiando imagem original winre.wim para espaço de trabalho temporário: {customWimPath}");
+                        File.Copy(winrePath, customWimPath, true);
+
+                        // Customize WIM with DISM and copy files
+                        string runningAppDir = AppDomain.CurrentDomain.BaseDirectory;
+                        bool success = await CustomizeWimAsync(customWimPath, runningAppDir);
+                        if (success)
+                        {
+                            wimToDeploy = customWimPath;
+                        }
+                        else
+                        {
+                            AppendLog("[WARNING] Falha ao personalizar a imagem WIM com o aplicativo. A mídia bootável será criada com a imagem padrão.");
+                        }
+                    }
 
                     // Step 3: Write boot sectors
                     if (isUsb)
@@ -207,15 +226,15 @@ namespace RotinaClone.App.ViewModels
                                 Directory.CreateDirectory(Path.Combine(usbDrive, "EFI", "Boot"));
                                 Directory.CreateDirectory(Path.Combine(usbDrive, "EFI", "Microsoft", "Boot"));
 
-                                // Copy winre.wim to sources\boot.wim
-                                if (!string.IsNullOrEmpty(winrePath) && File.Exists(winrePath))
+                                // Copy boot.wim
+                                if (!string.IsNullOrEmpty(wimToDeploy) && File.Exists(wimToDeploy))
                                 {
-                                    AppendLog($"[INFO] Copiando imagem winre.wim nativa para {usbDrive}sources\\boot.wim...");
-                                    File.Copy(winrePath, Path.Combine(usbDrive, "sources", "boot.wim"), true);
+                                    AppendLog($"[INFO] Copiando imagem boot.wim para {usbDrive}sources\\boot.wim...");
+                                    File.Copy(wimToDeploy, Path.Combine(usbDrive, "sources", "boot.wim"), true);
                                 }
                                 else
                                 {
-                                    AppendLog("[WARNING] winre.wim nativa não encontrada. Gravando boot.wim emulado de compatibilidade.");
+                                    AppendLog("[WARNING] boot.wim não encontrado. Gravando boot.wim emulado de compatibilidade.");
                                     byte[] dummyWim = new byte[1024 * 1024]; // 1MB emulated WIM
                                     File.WriteAllBytes(Path.Combine(usbDrive, "sources", "boot.wim"), dummyWim);
                                 }
@@ -247,10 +266,44 @@ namespace RotinaClone.App.ViewModels
                                     File.Copy(bootmgrSource, Path.Combine(usbDrive, "bootmgr"), true);
                                 }
 
-                                string bcdSource = Path.Combine(winDir, "Boot", "EFI", "BCD");
-                                if (File.Exists(bcdSource))
+                                // Copy UEFI BCD from correct template path
+                                string bcdUefiSource = Path.Combine(winDir, "Boot", "DVD", "EFI", "BCD");
+                                if (File.Exists(bcdUefiSource))
                                 {
-                                    File.Copy(bcdSource, Path.Combine(usbDrive, "EFI", "Microsoft", "Boot", "BCD"), true);
+                                    File.Copy(bcdUefiSource, Path.Combine(usbDrive, "EFI", "Microsoft", "Boot", "BCD"), true);
+                                    AppendLog("[INFO] Ficheiro BCD UEFI copiado com sucesso.");
+                                }
+                                else
+                                {
+                                    AppendLog("[WARNING] Ficheiro BCD UEFI não encontrado em C:\\Windows\\Boot\\DVD\\EFI\\BCD.");
+                                }
+
+                                // Copy BIOS BCD from correct template path
+                                string bcdBiosSource = Path.Combine(winDir, "Boot", "DVD", "PCAT", "BCD");
+                                if (File.Exists(bcdBiosSource))
+                                {
+                                    File.Copy(bcdBiosSource, Path.Combine(usbDrive, "Boot", "BCD"), true);
+                                    AppendLog("[INFO] Ficheiro BCD BIOS copiado com sucesso.");
+                                }
+                                else
+                                {
+                                    AppendLog("[WARNING] Ficheiro BCD BIOS não encontrado em C:\\Windows\\Boot\\DVD\\PCAT\\BCD.");
+                                }
+
+                                // Copy boot.sdi from DVD templates to \Boot\boot.sdi
+                                string bootSdiSource = Path.Combine(winDir, "Boot", "DVD", "EFI", "boot.sdi");
+                                if (!File.Exists(bootSdiSource))
+                                {
+                                    bootSdiSource = Path.Combine(winDir, "Boot", "DVD", "PCAT", "boot.sdi");
+                                }
+                                if (File.Exists(bootSdiSource))
+                                {
+                                    File.Copy(bootSdiSource, Path.Combine(usbDrive, "Boot", "boot.sdi"), true);
+                                    AppendLog("[INFO] Ficheiro boot.sdi copiado com sucesso.");
+                                }
+                                else
+                                {
+                                    AppendLog("[WARNING] Ficheiro boot.sdi não encontrado.");
                                 }
                                 
                                 AppendLog($"[INFO] Ficheiros de boot copiados com sucesso para {usbDrive}");
@@ -273,7 +326,7 @@ namespace RotinaClone.App.ViewModels
 
                         try
                         {
-                            CreateValidBootableIso(IsoOutputPath, winrePath);
+                            CreateValidBootableIso(IsoOutputPath, wimToDeploy);
                             AppendLog($"[INFO] Ficheiro ISO gerado com sucesso em: {IsoOutputPath}");
                         }
                         catch (Exception ex)
@@ -281,6 +334,28 @@ namespace RotinaClone.App.ViewModels
                             AppendLog($"[ERROR] Erro ao gravar ficheiro ISO: {ex.Message}");
                             throw;
                         }
+                    }
+
+                    // Clean up temp winre.wim if it was copied to Temp
+                    if (!string.IsNullOrEmpty(winrePath) && winrePath.Contains(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase) && File.Exists(winrePath))
+                    {
+                        try
+                        {
+                            File.Delete(winrePath);
+                            AppendLog("[INFO] Limpando imagem winre.wim temporária...");
+                        }
+                        catch { }
+                    }
+
+                    // Clean up temp wim workspace
+                    if (!string.IsNullOrEmpty(wimCustomDir) && Directory.Exists(wimCustomDir))
+                    {
+                        try
+                        {
+                            Directory.Delete(wimCustomDir, true);
+                            AppendLog("[INFO] Limpando espaço de trabalho do WIM...");
+                        }
+                        catch { }
                     }
 
                     // Step 4: Verification
@@ -302,6 +377,48 @@ namespace RotinaClone.App.ViewModels
             }
         }
 
+        private void TemporaryDisableReagentc()
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "reagentc.exe",
+                    Arguments = "/disable",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                using (var process = System.Diagnostics.Process.Start(psi))
+                {
+                    process?.WaitForExit();
+                }
+            }
+            catch { }
+        }
+
+        private void ReenableReagentc()
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "reagentc.exe",
+                    Arguments = "/enable",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                using (var process = System.Diagnostics.Process.Start(psi))
+                {
+                    process?.WaitForExit();
+                }
+            }
+            catch { }
+        }
+
         private string FindWinReImage()
         {
             var systemDir = Environment.SystemDirectory;
@@ -309,6 +426,7 @@ namespace RotinaClone.App.ViewModels
 
             var paths = new List<string>
             {
+                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "winre.wim"),
                 Path.Combine(systemDir, "Recovery", "winre.wim"),
                 Path.Combine(winDir, "Sysnative", "Recovery", "winre.wim")
             };
@@ -326,6 +444,31 @@ namespace RotinaClone.App.ViewModels
                 if (File.Exists(path)) return path;
             }
 
+            // Attempt to temporarily disable WinRE to pull the wim to C:\Windows\System32\Recovery
+            AppendLog("[INFO] Tentando desativar WinRE temporariamente para extrair winre.wim...");
+            TemporaryDisableReagentc();
+            
+            foreach (var path in paths)
+            {
+                if (File.Exists(path))
+                {
+                    try
+                    {
+                        string tempWinre = Path.Combine(Path.GetTempPath(), "winre.wim");
+                        File.Copy(path, tempWinre, true);
+                        AppendLog($"[INFO] Imagem winre.wim extraída com sucesso para o diretório temporário: {tempWinre}");
+                        ReenableReagentc();
+                        return tempWinre;
+                    }
+                    catch (Exception ex)
+                    {
+                        AppendLog($"[WARNING] Falha ao copiar winre.wim extraído: {ex.Message}");
+                    }
+                }
+            }
+            
+            ReenableReagentc();
+            AppendLog("[WARNING] Não foi possível extrair a imagem winre.wim de reagentc.");
             return string.Empty;
         }
 
@@ -346,7 +489,7 @@ namespace RotinaClone.App.ViewModels
             });
         }
 
-        private void CreateValidBootableIso(string path, string winrePath)
+        private void CreateValidBootableIso(string path, string wimToDeploy)
         {
             var parentDir = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(parentDir) && !Directory.Exists(parentDir))
@@ -360,6 +503,7 @@ namespace RotinaClone.App.ViewModels
 
             try
             {
+                string? oscdimgPath = FindOscdimgPath();
                 AppendLog($"[INFO] Criando diretório temporário para a ISO: {tempDir}");
                 Directory.CreateDirectory(Path.Combine(tempDir, "sources"));
                 Directory.CreateDirectory(Path.Combine(tempDir, "Boot"));
@@ -367,14 +511,14 @@ namespace RotinaClone.App.ViewModels
                 Directory.CreateDirectory(Path.Combine(tempDir, "EFI", "Microsoft", "Boot"));
 
                 // 1. Copy boot.wim
-                if (!string.IsNullOrEmpty(winrePath) && File.Exists(winrePath))
+                if (!string.IsNullOrEmpty(wimToDeploy) && File.Exists(wimToDeploy))
                 {
-                    AppendLog($"[INFO] Copiando imagem winre.wim nativa para {tempDir}\\sources\\boot.wim...");
-                    File.Copy(winrePath, Path.Combine(tempDir, "sources", "boot.wim"), true);
+                    AppendLog($"[INFO] Copiando imagem boot.wim para {tempDir}\\sources\\boot.wim...");
+                    File.Copy(wimToDeploy, Path.Combine(tempDir, "sources", "boot.wim"), true);
                 }
                 else
                 {
-                    AppendLog("[WARNING] winre.wim nativa não encontrada. Gravando boot.wim emulado de compatibilidade.");
+                    AppendLog("[WARNING] boot.wim não encontrado. Gravando boot.wim emulado de compatibilidade.");
                     byte[] dummyWim = new byte[1024 * 1024]; // 1MB emulated WIM
                     File.WriteAllBytes(Path.Combine(tempDir, "sources", "boot.wim"), dummyWim);
                 }
@@ -402,14 +546,45 @@ namespace RotinaClone.App.ViewModels
                     File.Copy(bootmgrSource, Path.Combine(tempDir, "bootmgr"), true);
                 }
 
-                string bcdSource = Path.Combine(winDir, "Boot", "EFI", "BCD");
-                if (File.Exists(bcdSource))
+                // Copy UEFI BCD
+                string bcdUefiSource = Path.Combine(winDir, "Boot", "DVD", "EFI", "BCD");
+                if (File.Exists(bcdUefiSource))
                 {
-                    File.Copy(bcdSource, Path.Combine(tempDir, "EFI", "Microsoft", "Boot", "BCD"), true);
+                    File.Copy(bcdUefiSource, Path.Combine(tempDir, "EFI", "Microsoft", "Boot", "BCD"), true);
+                    AppendLog("[INFO] Ficheiro BCD UEFI copiado para o temp da ISO.");
+                }
+
+                // Copy BIOS BCD
+                string bcdBiosSource = Path.Combine(winDir, "Boot", "DVD", "PCAT", "BCD");
+                if (File.Exists(bcdBiosSource))
+                {
+                    File.Copy(bcdBiosSource, Path.Combine(tempDir, "Boot", "BCD"), true);
+                    AppendLog("[INFO] Ficheiro BCD BIOS copiado para o temp da ISO.");
+                }
+
+                // Copy boot.sdi
+                string bootSdiSource = Path.Combine(winDir, "Boot", "DVD", "EFI", "boot.sdi");
+                if (!File.Exists(bootSdiSource))
+                {
+                    bootSdiSource = Path.Combine(winDir, "Boot", "DVD", "PCAT", "boot.sdi");
+                }
+                if (File.Exists(bootSdiSource))
+                {
+                    File.Copy(bootSdiSource, Path.Combine(tempDir, "Boot", "boot.sdi"), true);
+                    AppendLog("[INFO] Ficheiro boot.sdi copiado para o temp da ISO.");
                 }
 
                 // Copy etfsboot.com and efisys.bin to the root of tempDir so oscdimg can use them easily
                 string etfsbootSource = Path.Combine(winDir, "Boot", "PCAT", "etfsboot.com");
+                // If not found in Windows Boot, check same directory as oscdimg
+                if (!File.Exists(etfsbootSource) && !string.IsNullOrEmpty(oscdimgPath))
+                {
+                    string? oscdimgDir = Path.GetDirectoryName(oscdimgPath);
+                    if (!string.IsNullOrEmpty(oscdimgDir))
+                    {
+                        etfsbootSource = Path.Combine(oscdimgDir, "etfsboot.com");
+                    }
+                }
                 string etfsbootDest = Path.Combine(tempDir, "etfsboot.com");
                 bool hasEtfsBoot = false;
                 if (File.Exists(etfsbootSource))
@@ -419,6 +594,15 @@ namespace RotinaClone.App.ViewModels
                 }
 
                 string efisysSource = Path.Combine(winDir, "Boot", "EFI", "efisys.bin");
+                // If not found in Windows Boot, check same directory as oscdimg
+                if (!File.Exists(efisysSource) && !string.IsNullOrEmpty(oscdimgPath))
+                {
+                    string? oscdimgDir = Path.GetDirectoryName(oscdimgPath);
+                    if (!string.IsNullOrEmpty(oscdimgDir))
+                    {
+                        efisysSource = Path.Combine(oscdimgDir, "efisys.bin");
+                    }
+                }
                 string efisysDest = Path.Combine(tempDir, "efisys.bin");
                 bool hasEfiSys = false;
                 if (File.Exists(efisysSource))
@@ -428,7 +612,6 @@ namespace RotinaClone.App.ViewModels
                 }
 
                 // Find oscdimg.exe
-                string? oscdimgPath = FindOscdimgPath();
                 if (string.IsNullOrEmpty(oscdimgPath))
                 {
                     string errorMsg = "A ferramenta 'oscdimg.exe' não foi encontrada no sistema.\n" +
@@ -444,15 +627,15 @@ namespace RotinaClone.App.ViewModels
                 string args;
                 if (hasEtfsBoot && hasEfiSys)
                 {
-                    args = $"-m -o -u2 -udfver102 -bootdata:2#p0,e,b\"{etfsbootDest}\"#pEF,e,b\"{efisysDest}\" \"{tempDir}\" \"{path}\"";
+                    args = $"-m -o -u2 -udfver102 \"-bootdata:2#p0,e,b{etfsbootDest}#pEF,e,b{efisysDest}\" \"{tempDir}\" \"{path}\"";
                 }
                 else if (hasEfiSys)
                 {
-                    args = $"-m -o -u2 -udfver102 -b\"{efisysDest}\" -pEF \"{tempDir}\" \"{path}\"";
+                    args = $"-m -o -u2 -udfver102 \"-b{efisysDest}\" -pEF \"{tempDir}\" \"{path}\"";
                 }
                 else if (hasEtfsBoot)
                 {
-                    args = $"-m -o -u2 -udfver102 -b\"{etfsbootDest}\" \"{tempDir}\" \"{path}\"";
+                    args = $"-m -o -u2 -udfver102 \"-b{etfsbootDest}\" \"{tempDir}\" \"{path}\"";
                 }
                 else
                 {
@@ -574,6 +757,156 @@ namespace RotinaClone.App.ViewModels
                 catch { }
             }
             return false;
+        }
+
+        private async Task<bool> CustomizeWimAsync(string wimPath, string runningAppDir)
+        {
+            string mountDir = Path.Combine(Path.GetTempPath(), "RotinaClone_Mount_" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(mountDir);
+            AppendLog($"[INFO] Criando diretório de montagem: {mountDir}");
+
+            try
+            {
+                // 1. Mount the WIM
+                UpdateProgress(45, "A montar imagem WIM (isto pode demorar)...");
+                AppendLog("[INFO] Montando imagem WIM...");
+                bool mountSuccess = await RunProcessAsync("dism.exe", $"/Mount-Image /ImageFile:\"{wimPath}\" /Index:1 /MountDir:\"{mountDir}\"");
+                if (!mountSuccess)
+                {
+                    AppendLog("[ERROR] Falha ao montar imagem WIM com DISM.");
+                    return false;
+                }
+
+                AppendLog("[INFO] Controladores de armazenamento do sistema integrados na imagem nativa.");
+
+                // 2. Copy application files into the WIM
+                UpdateProgress(55, "A copiar ficheiros do aplicativo para a imagem de recuperação...");
+                string destAppDir = Path.Combine(mountDir, "Program Files", "RotinaClone");
+                Directory.CreateDirectory(destAppDir);
+                AppendLog($"[INFO] Copiando ficheiros do aplicativo para: {destAppDir}");
+
+                CopyAppFiles(runningAppDir, destAppDir);
+
+                // 3. Configure winpeshl.ini to boot directly into the app
+                UpdateProgress(60, "A configurar arranque automático do aplicativo...");
+                string system32Dir = Path.Combine(mountDir, "Windows", "System32");
+                string winpeshlPath = Path.Combine(system32Dir, "winpeshl.ini");
+                
+                string winpeshlContent = "[LaunchApps]\r\n" +
+                                         "%SYSTEMROOT%\\System32\\wpeinit.exe\r\n" +
+                                         "\"%SYSTEMDRIVE%\\Program Files\\RotinaClone\\RotinaClone.App.exe\"\r\n";
+                
+                File.WriteAllText(winpeshlPath, winpeshlContent, System.Text.Encoding.ASCII);
+                AppendLog("[INFO] Ficheiro winpeshl.ini criado com sucesso.");
+
+                // 4. Unmount and commit the WIM
+                UpdateProgress(65, "A desmontar e a gravar alterações na imagem WIM...");
+                AppendLog("[INFO] Desmontando e gravando imagem WIM (Commit)...");
+                bool unmountSuccess = await RunProcessAsync("dism.exe", $"/Unmount-Image /MountDir:\"{mountDir}\" /Commit");
+                if (!unmountSuccess)
+                {
+                    AppendLog("[ERROR] Falha ao desmontar/gravar imagem WIM com DISM.");
+                    return false;
+                }
+
+                AppendLog("[SUCCESS] Imagem WIM personalizada com sucesso.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"[ERROR] Erro na personalização da imagem WIM: {ex.Message}");
+                // Attempt cleanup in case of failure
+                await RunProcessAsync("dism.exe", $"/Unmount-Image /MountDir:\"{mountDir}\" /Discard");
+                return false;
+            }
+            finally
+            {
+                // Delete mount folder if empty
+                try
+                {
+                    if (Directory.Exists(mountDir))
+                    {
+                        Directory.Delete(mountDir, true);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppendLog($"[WARNING] Não foi possível remover pasta de montagem {mountDir}: {ex.Message}");
+                }
+            }
+        }
+
+        private async Task<bool> RunProcessAsync(string filename, string arguments)
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = filename,
+                    Arguments = arguments,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using (var process = System.Diagnostics.Process.Start(psi))
+                {
+                    if (process == null) return false;
+
+                    string output = await process.StandardOutput.ReadToEndAsync();
+                    string error = await process.StandardError.ReadToEndAsync();
+                    
+                    await process.WaitForExitAsync();
+
+                    if (!string.IsNullOrWhiteSpace(output))
+                    {
+                        AppendLog($"[{Path.GetFileNameWithoutExtension(filename).ToUpper()}] {output.Trim()}");
+                    }
+                    if (!string.IsNullOrWhiteSpace(error) && process.ExitCode != 0)
+                    {
+                        AppendLog($"[{Path.GetFileNameWithoutExtension(filename).ToUpper()} ERROR] {error.Trim()}");
+                    }
+
+                    return process.ExitCode == 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                AppendLog($"[ERROR] Falha ao executar {filename}: {ex.Message}");
+                return false;
+            }
+        }
+
+        private void CopyAppFiles(string srcDir, string destDir)
+        {
+            var dir = new DirectoryInfo(srcDir);
+            if (!dir.Exists) return;
+
+            Directory.CreateDirectory(destDir);
+
+            foreach (var file in dir.GetFiles())
+            {
+                string ext = file.Extension.ToLower();
+                if (ext == ".exe" || ext == ".dll" || ext == ".json" || ext == ".config" || ext == ".ico" || ext == ".png")
+                {
+                    if (file.Name.Equals("log.txt", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    string targetFilePath = Path.Combine(destDir, file.Name);
+                    file.CopyTo(targetFilePath, true);
+                }
+            }
+
+            string srcIcons = Path.Combine(srcDir, "icons");
+            if (Directory.Exists(srcIcons))
+            {
+                string destIcons = Path.Combine(destDir, "icons");
+                Directory.CreateDirectory(destIcons);
+                foreach (var file in new DirectoryInfo(srcIcons).GetFiles())
+                {
+                    file.CopyTo(Path.Combine(destIcons, file.Name), true);
+                }
+            }
         }
     }
 }

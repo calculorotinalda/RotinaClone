@@ -28,7 +28,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 ; Grab files directly from the published portable build directory
-Source: "publish_portable_20260611_202656\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
+Source: "publish_portable\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs
 Source: "icons\icon.ico"; DestDir: "{app}\icons"; Flags: ignoreversion
 
 [Icons]
